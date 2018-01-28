@@ -124,30 +124,30 @@ def main():
             description='Generate CW (morse code) audio files from text')
 
     g_files = parser.add_argument_group('Input/Output')
-    g_files.add_argument('--input', type=FileType('r'),
+    g_files.add_argument('--input', '-i', type=FileType('r'),
             help='Read text from this file', required=True)
-    g_files.add_argument('--wave', type=FileType('wb'),
+    g_files.add_argument('--wave', '-w', type=FileType('wb'),
             help='Write WAVE output to this file')
     g_files.add_argument('--quiet', '-q', action='store_true',
             help='Be more quiet')
 
     g_gen = parser.add_argument_group('CW Generation')
-    g_gen.add_argument('--normalise-special-characters', action='store_true',
+    g_gen.add_argument('--normalise-special-characters', '-c', action='store_true',
             help='Normalise special characters, like á to a')
-    g_gen.add_argument('--frequency', type=int, default=600,
+    g_gen.add_argument('--frequency', '-f', type=int, default=600,
             help='Tone frequency in Hz (default: 600)')
-    g_gen.add_argument('--wpm', type=int, default=12,
+    g_gen.add_argument('--wpm', '-s', type=int, default=12,
             help='Initial speed in WPM (default: 12)')
-    g_gen.add_argument('--length-standard-deviation', type=float, default=0.0,
+    g_gen.add_argument('--length-standard-deviation', '-d', type=float, default=0.0,
             help='Standard deviation from dotlength, '
                 'relative to the dot length (default: 0.0; sensible: < 0.2)')
-    g_gen.add_argument('--length-drift', type=float, default=0.0,
+    g_gen.add_argument('--length-drift', '-D', type=float, default=0.0,
             help='Speed drift (default: 0.0; suggested: 0.02)')
 
     g_noise = parser.add_argument_group('Noise Generation')
-    g_noise.add_argument('--noise-kind', type=str, default='white',
+    g_noise.add_argument('--noise-kind', '-N', type=str, default='white',
             help='Noise kind (default: white; other values: pink, blue, brown, violet)')
-    g_noise.add_argument('--noise-level', type=float, default=0.0,
+    g_noise.add_argument('--noise-level', '-n', type=float, default=0.0,
             help='Add noise with this amplitude (0 <= a <= 1; default: 0)')
 
     args = parser.parse_args()

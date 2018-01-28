@@ -5,7 +5,6 @@ import math
 import random
 import struct
 
-from acoustics.generator import noise
 import wave
 
 FRAMERATE = 44100
@@ -49,6 +48,10 @@ def normalise_char(char):
         return ' '
     return char.lower()
 
+def normalise_special_characters(char):
+    from unidecode import unidecode
+    return unidecode(char)
+
 def char_to_cw(char, normalise):
     if normalise:
         char = normalise_special_characters(char)
@@ -65,11 +68,8 @@ def sine_wave(frequency, framerate=44100, amplitude=0.5):
             for i in range(period)]
     return (lookup_table[i%period] for i in itertools.count(0))
 
-# After https://zach.se/generate-audio-with-python/
-def white_noise(amplitude=0.5):
-    return (float(amplitude) * random.uniform(-1, 1) for i in itertools.count(0))
-
 def noise_generator(kind, amplitude):
+    from acoustics.generator import noise
     samples = noise(FRAMERATE, kind)
     samples = [s / 5 * amplitude for s in samples]
     return itertools.cycle(samples)
@@ -161,7 +161,8 @@ def main():
     gen = CWGenerator(
             wpm=args.wpm,
             length_standard_deviation=args.length_standard_deviation,
-            length_drift=args.length_drift)
+            length_drift=args.length_drift,
+            normalise_special_characters=args.normalise_special_characters)
     stream = gen.produce(args.input.read())
     if args.wave is not None:
         wav = wave.open(args.wave)

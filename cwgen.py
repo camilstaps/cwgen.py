@@ -135,13 +135,8 @@ class CWGenerator:
             yield from self.produce_char(char)
             self.drift()
 
-def generate_wav(wav, stream, frame_rate=44100, frequency=600,
+def generate_wav(stream, frame_rate=44100, frequency=600,
         noise_kind=None, noise_level=0.0):
-    wav = wave.open(wav)
-    wav.setnchannels(1)
-    wav.setsampwidth(SAMPWIDTH)
-    wav.setframerate(frame_rate)
-
     max_amp = int(2 ** (8 * SAMPWIDTH - 1)) - 1
 
     audio = []
@@ -163,7 +158,8 @@ def generate_wav(wav, stream, frame_rate=44100, frequency=600,
         audio = mix(audio, noise)
     audio = list(map(int, audio))
     frames = struct.pack('{0:d}h'.format(len(audio)), *audio)
-    wav.writeframes(frames)
+
+    return frames
 
 def main():
     parser = ArgumentParser(
@@ -180,6 +176,8 @@ def main():
             help='Write CSV output to this file')
     g_files.add_argument('--quiet', '-q', action='store_true',
             help='Be more quiet')
+    g_files.add_argument('--play', '-p', action='store_true',
+            help='Playback')
 
     g_gen = parser.add_argument_group('CW Generation')
     g_gen.add_argument('--normalise-special-characters', '-c', action='store_true',
@@ -227,9 +225,32 @@ def main():
         for on, duration in stream:
             wr.writerow([on, int(duration)])
 
-    if args.wave is not None:
-        generate_wav(args.wave, stream, args.frame_rate, args.frequency,
+    if args.wave is not None or args.play:
+        frames = generate_wav(stream, args.frame_rate, args.frequency,
                 args.noise_kind, args.noise_level)
+
+        if args.wave is not None:
+            wav = wave.open(args.wave)
+            wav.setnchannels(1)
+            wav.setsampwidth(SAMPWIDTH)
+            wav.setframerate(args.frame_rate)
+            wav.writeframes(frames)
+        if args.play:
+            import pyaudio
+            player = pyaudio.PyAudio()
+            player = player.open(
+                    format=player.get_format_from_width(SAMPWIDTH),
+                    channels=1,
+                    rate=args.frame_rate,
+                    output=True)
+            try:
+                block_size = int(args.frame_rate / 4)
+                while len(frames) > 0:
+                    data = frames[:block_size]
+                    frames = frames[block_size:]
+                    player.write(data)
+            except KeyboardInterrupt:
+                pass
 
 if __name__ == '__main__':
     main()

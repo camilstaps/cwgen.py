@@ -80,10 +80,14 @@ def mix(*signals):
 class CWGenerator:
     def __init__(self,
             wpm,
+            min_wpm,
+            max_wpm,
             length_standard_deviation=0.0,
             length_drift=0.0,
             normalise_special_characters=False):
         self.wpm = wpm
+        self.min_wpm = min_wpm
+        self.max_wpm = max_wpm
         self.length_standard_deviation = length_standard_deviation
         self.length_drift = length_drift
         self.normalise_special_characters = normalise_special_characters
@@ -112,12 +116,17 @@ class CWGenerator:
                 yield (False, self.dot_length())
         yield (False, self.dash_length())
 
+    def drift(self):
+        drift = random.gauss(1.0, self.length_drift)
+        drift = min(max(drift, 1 - self.length_drift), 1 + self.length_drift)
+        self.wpm *= drift
+        if self.min_wpm is not None: self.wpm = max(self.min_wpm, self.wpm)
+        if self.max_wpm is not None: self.wpm = min(self.max_wpm, self.wpm)
+
     def produce(self, string):
         for char in string:
             yield from self.produce_char(char)
-            drift = random.gauss(1.0, self.length_drift)
-            drift = min(max(drift, 1 - self.length_drift), 1 + self.length_drift)
-            self.wpm *= drift
+            self.drift()
 
 def main():
     parser = ArgumentParser(
@@ -138,6 +147,10 @@ def main():
             help='Tone frequency in Hz (default: 600)')
     g_gen.add_argument('--wpm', '-s', type=int, default=12,
             help='Initial speed in WPM (default: 12)')
+    g_gen.add_argument('--max-wpm', type=int, default=None,
+            help='Maximum speed in WPM (default: none)')
+    g_gen.add_argument('--min-wpm', type=int, default=None,
+            help='Minimum speed in WPM (default: none)')
     g_gen.add_argument('--length-standard-deviation', '-d', type=float, default=0.0,
             help='Standard deviation from dotlength, '
                 'relative to the dot length (default: 0.0; sensible: < 0.2)')
@@ -145,8 +158,8 @@ def main():
             help='Speed drift (default: 0.0; suggested: 0.02)')
 
     g_noise = parser.add_argument_group('Noise Generation')
-    g_noise.add_argument('--noise-kind', '-N', type=str, default='white',
-            help='Noise kind (default: white; other values: pink, blue, brown, violet)')
+    g_noise.add_argument('--noise-kind', '-N', type=str, default='pink',
+            help='Noise kind (default: pink; other values: white, blue, brown, violet)')
     g_noise.add_argument('--noise-level', '-n', type=float, default=0.0,
             help='Add noise with this amplitude (0 <= a <= 1; default: 0)')
 
@@ -160,6 +173,8 @@ def main():
 
     gen = CWGenerator(
             wpm=args.wpm,
+            min_wpm=args.min_wpm,
+            max_wpm=args.max_wpm,
             length_standard_deviation=args.length_standard_deviation,
             length_drift=args.length_drift,
             normalise_special_characters=args.normalise_special_characters)

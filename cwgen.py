@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser, FileType
+import csv
 import itertools
 import math
 import random
@@ -138,6 +139,8 @@ def main():
             help='Write WAVE output to this file')
     g_files.add_argument('--frame-rate', type=int, default=22050,
             help='Frame rate in Hz (default: 22050)')
+    g_files.add_argument('--csv', type=FileType('w'),
+            help='Write CSV output to this file')
     g_files.add_argument('--quiet', '-q', action='store_true',
             help='Be more quiet')
 
@@ -179,7 +182,14 @@ def main():
             length_standard_deviation=args.length_standard_deviation,
             length_drift=args.length_drift,
             normalise_special_characters=args.normalise_special_characters)
-    stream = gen.produce(args.input.read())
+    stream = list(gen.produce(args.input.read()))
+
+    if args.csv is not None:
+        wr = csv.writer(args.csv)
+        wr.writerow(['On','Duration'])
+        for on, duration in stream:
+            wr.writerow([on, int(duration)])
+
     if args.wave is not None:
         wav = wave.open(args.wave)
         wav.setnchannels(1)

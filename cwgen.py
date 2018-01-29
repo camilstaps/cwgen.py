@@ -176,8 +176,11 @@ def main():
             description='Generate CW (morse code) audio files from text')
 
     g_files = parser.add_argument_group('Input/Output')
-    g_files.add_argument('--input', '-i', type=FileType('r'),
-            help='Read text from this file', required=True)
+    g_input = g_files.add_mutually_exclusive_group(required=True)
+    g_input.add_argument('--text', '-t',
+            help='Text to convert to morse code')
+    g_input.add_argument('--input', '-i', type=FileType('r'),
+            help='Read text from this file')
     g_files.add_argument('--wave', '-w', type=FileType('wb'),
             help='Write WAVE output to this file')
     g_files.add_argument('--frame-rate', type=int, default=22050,
@@ -227,7 +230,12 @@ def main():
             length_standard_deviation=args.length_standard_deviation,
             length_drift=args.length_drift,
             normalise_special_characters=args.normalise_special_characters)
-    stream = list(gen.produce(args.input.read()))
+
+    if args.text is not None:
+        text = args.text
+    elif args.input is not None:
+        text = args.input.read()
+    stream = list(gen.produce(text))
 
     if args.csv is not None:
         wr = csv.writer(args.csv)

@@ -172,15 +172,19 @@ def main():
 
         max_amp = int(2 ** (8 * SAMPWIDTH - 1)) - 1
 
+        if args.noise_level > 0.0:
+            noise = noise_generator(args.noise_kind, args.noise_level)
+
+        frames = []
         for on, duration in stream:
             audio = sine_wave(
                     frequency=args.frequency,
                     amplitude=0.5 if on else 0.0)
             if args.noise_level > 0.0:
-                audio = mix(audio, noise_generator(args.noise_kind, args.noise_level))
+                audio = mix(audio, noise)
             audio = itertools.islice(audio, int(duration * FRAMERATE / 1000))
-            audio = b''.join(struct.pack('h', int(max_amp * a)) for a in audio)
-            wav.writeframes(audio)
+            frames += [struct.pack('h', int(max_amp * a)) for a in audio]
+        wav.writeframes(b''.join(frames))
 
 if __name__ == '__main__':
     main()

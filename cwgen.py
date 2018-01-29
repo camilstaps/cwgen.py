@@ -59,20 +59,27 @@ def char_to_cw(char, normalise):
 
     return CHARS[char]
 
-# After https://zach.se/generate-audio-with-python/
-def sine_wave(frequency, framerate=44100, amplitude=0.5):
-    period = int(framerate / frequency)
+def cycle_n(xs, n):
+    length = len(xs)
+    periods = math.floor(n / length)
+    rest = n - periods * length
+    return periods * xs + xs[:rest]
+
+def sine_wave(frequency, duration, frame_rate=44100, amplitude=0.5):
+    period = int(frame_rate / frequency)
     amp = min(max(amplitude, 0.0), 1.0)
     lookup_table = [amplitude *
-            math.sin(2.0 * math.pi * frequency * (i%period) / framerate)
+            math.sin(2.0 * math.pi * frequency * (i%period) / frame_rate)
             for i in range(period)]
-    return (lookup_table[i%period] for i in itertools.count(0))
 
-def noise_generator(kind, framerate, amplitude):
+    return cycle_n(lookup_table, int(duration * frame_rate / 1000))
+
+def noise_generator(kind, duration, frame_rate=44100, amplitude=0.5):
     from acoustics.generator import noise
-    samples = noise(framerate, kind)
+    samples = noise(frame_rate, kind)
     samples = [s / 5 * amplitude for s in samples]
-    return itertools.cycle(samples)
+
+    return cycle_n(samples, int(duration * frame_rate / 1000))
 
 def mix(*signals):
     return map(sum, zip(*signals))
@@ -127,6 +134,36 @@ class CWGenerator:
         for char in string:
             yield from self.produce_char(char)
             self.drift()
+
+def generate_wav(wav, stream, frame_rate=44100, frequency=600,
+        noise_kind=None, noise_level=0.0):
+    wav = wave.open(wav)
+    wav.setnchannels(1)
+    wav.setsampwidth(SAMPWIDTH)
+    wav.setframerate(frame_rate)
+
+    max_amp = int(2 ** (8 * SAMPWIDTH - 1)) - 1
+
+    audio = []
+    length = 0
+    for on, duration in stream:
+        audio.append(sine_wave(
+                frequency=frequency,
+                duration=duration,
+                frame_rate=frame_rate,
+                amplitude=0.5 * max_amp if on else 0.0))
+        length += duration
+    audio = [a for parts in audio for a in parts]
+    if noise_level > 0.0:
+        noise = noise_generator(
+                noise_kind,
+                length,
+                frame_rate,
+                noise_level * max_amp)
+        audio = mix(audio, noise)
+    audio = list(map(int, audio))
+    frames = struct.pack('{0:d}h'.format(len(audio)), *audio)
+    wav.writeframes(frames)
 
 def main():
     parser = ArgumentParser(
@@ -191,27 +228,8 @@ def main():
             wr.writerow([on, int(duration)])
 
     if args.wave is not None:
-        wav = wave.open(args.wave)
-        wav.setnchannels(1)
-        wav.setsampwidth(SAMPWIDTH)
-        wav.setframerate(args.frame_rate)
-
-        max_amp = int(2 ** (8 * SAMPWIDTH - 1)) - 1
-
-        if args.noise_level > 0.0:
-            noise = noise_generator(args.noise_kind, args.frame_rate, args.noise_level)
-
-        frames = []
-        for on, duration in stream:
-            audio = sine_wave(
-                    frequency=args.frequency,
-                    framerate=args.frame_rate,
-                    amplitude=0.5 if on else 0.0)
-            if args.noise_level > 0.0:
-                audio = mix(audio, noise)
-            audio = itertools.islice(audio, int(duration * args.frame_rate / 1000))
-            frames += [struct.pack('h', int(max_amp * a)) for a in audio]
-        wav.writeframes(b''.join(frames))
+        generate_wav(args.wave, stream, args.frame_rate, args.frequency,
+                args.noise_kind, args.noise_level)
 
 if __name__ == '__main__':
     main()

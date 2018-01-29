@@ -118,7 +118,7 @@ class CWGenerator:
     def dash_length(self):
         return 3 * self.dot_length()
 
-    def produce_char(self, char):
+    def _produce_char(self, char):
         elems = char_to_cw(char, self.normalise_special_characters)
         i = 0
         for elem in elems:
@@ -127,7 +127,7 @@ class CWGenerator:
             elif elem == '-':
                 yield (True, self.dash_length())
             elif elem == ' ':
-                yield (False, self.dot_length() * 4)
+                yield (False, self.dot_length() * 1)
             i += 1
             if i < len(elems):
                 yield (False, self.dot_length())
@@ -140,10 +140,23 @@ class CWGenerator:
         if self.min_wpm is not None: self.wpm = max(self.min_wpm, self.wpm)
         if self.max_wpm is not None: self.wpm = min(self.max_wpm, self.wpm)
 
-    def produce(self, string):
+    def _produce(self, string):
         for char in string:
-            yield from self.produce_char(char)
+            yield from self._produce_char(char)
             self.drift()
+
+    def produce(self, string):
+        _on = False
+        _duration = 0
+        for on, duration in self._produce(string):
+            if _on != on:
+                if _duration != 0:
+                    yield (_on, _duration)
+                _on = on
+                _duration = 0
+            _duration += duration
+        if _on != False:
+            yield (_on, _duration)
 
 def generate_wav(stream, frame_rate=44100, frequency=600,
         noise_kind=None, noise_level=0.0):
@@ -239,9 +252,8 @@ def main():
 
     if args.csv is not None:
         wr = csv.writer(args.csv)
-        wr.writerow(['On','Duration'])
         for on, duration in stream:
-            wr.writerow([on, int(duration)])
+            wr.writerow([1 if on else 0, int(duration)])
 
     if args.wave is not None or args.play:
         frames = generate_wav(stream, args.frame_rate, args.frequency,

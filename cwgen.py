@@ -7,7 +7,6 @@ import struct
 
 import wave
 
-FRAMERATE = 44100
 SAMPWIDTH = 2 # 16-bit audio
 
 CHARS = {
@@ -68,9 +67,9 @@ def sine_wave(frequency, framerate=44100, amplitude=0.5):
             for i in range(period)]
     return (lookup_table[i%period] for i in itertools.count(0))
 
-def noise_generator(kind, amplitude):
+def noise_generator(kind, framerate, amplitude):
     from acoustics.generator import noise
-    samples = noise(FRAMERATE, kind)
+    samples = noise(framerate, kind)
     samples = [s / 5 * amplitude for s in samples]
     return itertools.cycle(samples)
 
@@ -137,6 +136,8 @@ def main():
             help='Read text from this file', required=True)
     g_files.add_argument('--wave', '-w', type=FileType('wb'),
             help='Write WAVE output to this file')
+    g_files.add_argument('--frame-rate', type=int, default=22050,
+            help='Frame rate in Hz (default: 22050)')
     g_files.add_argument('--quiet', '-q', action='store_true',
             help='Be more quiet')
 
@@ -183,21 +184,22 @@ def main():
         wav = wave.open(args.wave)
         wav.setnchannels(1)
         wav.setsampwidth(SAMPWIDTH)
-        wav.setframerate(FRAMERATE)
+        wav.setframerate(args.frame_rate)
 
         max_amp = int(2 ** (8 * SAMPWIDTH - 1)) - 1
 
         if args.noise_level > 0.0:
-            noise = noise_generator(args.noise_kind, args.noise_level)
+            noise = noise_generator(args.noise_kind, args.frame_rate, args.noise_level)
 
         frames = []
         for on, duration in stream:
             audio = sine_wave(
                     frequency=args.frequency,
+                    framerate=args.frame_rate,
                     amplitude=0.5 if on else 0.0)
             if args.noise_level > 0.0:
                 audio = mix(audio, noise)
-            audio = itertools.islice(audio, int(duration * FRAMERATE / 1000))
+            audio = itertools.islice(audio, int(duration * args.frame_rate / 1000))
             frames += [struct.pack('h', int(max_amp * a)) for a in audio]
         wav.writeframes(b''.join(frames))
 
